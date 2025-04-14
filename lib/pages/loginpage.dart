@@ -1,113 +1,166 @@
 import 'package:flutter/material.dart';
-import 'package:icp/utils/helper.dart';
-import 'package:icp/utils/httpclient.dart';
 import 'package:flutter_web_browser/flutter_web_browser.dart';
+import 'package:icp/pages/homepage.dart';
 
-import 'package:app_links/app_links.dart';
 import '../state/objects/ApiOAuth.dart';
 
 class LoginPage extends StatefulWidget {
+  LoginPage({Key? key}) : super(key: key);
+
   @override
   _LoginPageState createState() => _LoginPageState();
 }
 
 class _LoginPageState extends State<LoginPage> {
-  final appLinks = AppLinks();
-  bool _isLoading = false;
+  bool showLoginFields = false;
+  bool error = false;
+  String url = 'https://fosstodon.org';
+  ApiOAuth api = ApiOAuth();
 
   @override
   void initState() {
     super.initState();
-    _handleIncomingLinks();
+    handleInitialDeepLink(); // Look for code on startup
+    checkLoginStatus();
   }
 
-  @override
-  void dispose() {
-    super.dispose();
-  }
-
-  // Method to handle the incoming link (when the app is already running)
-  void _handleIncomingLinks() {
-    appLinks.uriLinkStream.listen((uri) async {
-      if (uri != null) {
-        await _handleUri(uri);
+  void handleInitialDeepLink() async {
+    final uri = Uri.base; // e.g., ICP://ralfkraemer.eu?code=abc123
+    if (uri.scheme == 'icp' && uri.queryParameters.containsKey('code')) {
+      final code = uri.queryParameters['code'];
+      if (code != null) {
+        await api.exchangeCodeForTokens(code);
+        navigateToTimeline();
       }
-    }, onError: (Object err) {
-      print('Error occurred while handling URI: $err');
-    });
+    }
   }
 
-  // Extract the code from the URI
-  String? extractCodeFromUri(Uri uri) {
-    var parameters = Uri.splitQueryString(uri.query);
-    return parameters.containsKey('code') ? parameters['code'] : null;
-  }
-
-  // Method to handle the URI after the user returns to the app from the web browser
-  Future<void> _handleUri(Uri uri) async {
-    var code = extractCodeFromUri(uri);
-    if (code != null) {
+  void checkLoginStatus() async {
+    var access_token = await api.maybeRefreshAccessToken();
+    print("Access token: $access_token");
+    if (access_token == null) {
       setState(() {
-        _isLoading = true;
+        showLoginFields = true;
       });
-      try {
-        var api = ApiOAuth();
-        await api.exchangeCodeForTokens(code);  // Exchange code for tokens
-        // Close the browser after the token exchange
-        await FlutterWebBrowser.close();
-        Navigator.pushReplacementNamed(context, '/homepage'); // Redirect to homepage after login
-      } catch (e) {
-        print('Error exchanging code for tokens: $e');
-        setState(() {
-          _isLoading = false;
-        });
-        // Handle error gracefully (e.g., show an error message to the user)
-      }
     } else {
-      print('No code found in URI');
+      navigateToTimeline();
+    }
+  }
+
+  void prepareLogin(String? _url) async {
+    try {
+      await api.setBaseUrl(_url ?? url);
+      await api.fetchClientIdSecret();
+      var redirectUrl = await api.getRedirectUrl();
+      openOAuthScreen(redirectUrl);
+    } catch (e) {
       setState(() {
-        _isLoading = false;
+        error = true;
       });
     }
   }
 
-  // Method to initiate the OAuth login process
-  Future<void> _startOAuth() async {
-    setState(() {
-      _isLoading = true;
-    });
+  void openOAuthScreen(String url) {
+    FlutterWebBrowser.openWebPage(
+      url: url,
+      customTabsOptions: CustomTabsOptions(
+        shareState: CustomTabsShareState.on,
+        instantAppsEnabled: true,
+        showTitle: true,
+        urlBarHidingEnabled: true,
+      ),
+      safariVCOptions: SafariViewControllerOptions(
+        barCollapsingEnabled: true,
+        dismissButtonStyle: SafariViewControllerDismissButtonStyle.close,
+        modalPresentationCapturesStatusBarAppearance: true,
+      ),
+    );
+  }
 
-    try {
-      var api = ApiOAuth();
-      var redirectUrl = await api.getRedirectUrl();
-      // Open the browser to the OAuth URL
-      await FlutterWebBrowser.openWebPage(url: redirectUrl);
-    } catch (e) {
-      print('Error starting OAuth process: $e');
-      setState(() {
-        _isLoading = false;
-      });
-      // Handle error gracefully (e.g., show an error message to the user)
-    }
+  void navigateToTimeline() {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute<void>(
+        builder: (BuildContext context) => HomePage(),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Login')),
-      body: Center(
-        child: _isLoading
-            ? CircularProgressIndicator() // Show loading indicator when waiting for the login process
-            : Column(
+      body: showLoginFields
+          ? Center(
+              child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
+                  LogoLoading(),
+                  SizedBox(height: 48, child: Text("icp", style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold))),
+                  TextButton(
+                    onPressed: () => prepareLogin("https://icp.social"),
+                    style: ButtonStyle(backgroundColor: WidgetStatePropertyAll<Color>(Colors.green)),
+                    child: Text('🌼 icp.social', style: TextStyle(fontSize: 18, color: Colors.white)),
+                  ),
+                  TextButton(
+                    onPressed: () => prepareLogin("https://mastodon.social"),
+                    style: ButtonStyle(backgroundColor: WidgetStatePropertyAll<Color>(Colors.deepPurple)),
+                    child: Text('🦣 Mastodon.social', style: TextStyle(fontSize: 18, color: Colors.white)),
+                  ),
+                  SizedBox(height: 24, child: Text("OR", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
+                  DropdownMenu(
+                    label: Text("OR pick entry point"),
+                    dropdownMenuEntries: [
+                      DropdownMenuEntry(value: "https://mas.to", label: "🦣 mas.to"),
+                      DropdownMenuEntry(value: "https://fosstodon.org", label: "💻 Fosstodon"),
+                      DropdownMenuEntry(value: "https://mstdn.social", label: "🐘 mstdn.social"),
+                    ],
+                    onSelected: (value) {
+                      prepareLogin(value);
+                    },
+                  ),
+                  SizedBox(height: 24, child: Text("OR", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
+                  Container(
+                    margin: EdgeInsets.symmetric(horizontal: 50.0),
+                    child: TextField(
+                      onChanged: (value) => url = value,
+                      textInputAction: TextInputAction.go,
+                      autocorrect: false,
+                      textCapitalization: TextCapitalization.none,
+                      decoration: InputDecoration(
+                        labelText: 'URL of ActivityPub instance',
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: 32),
                   ElevatedButton(
-                    onPressed: _startOAuth, // Start OAuth login
-                    child: Text('Login with OAuth'),
+                    onPressed: () => prepareLogin(url),
+                    child: Text('Connect'),
                   ),
                 ],
               ),
+            )
+          : Center(child: LogoLoading()),
+    );
+  }
+}
+
+class LogoLoading extends StatelessWidget {
+  const LogoLoading({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xff7c94b6),
+        image: const DecorationImage(
+          image: AssetImage('assets/images/logo-icp.png'),
+          fit: BoxFit.fill,
+        ),
+        border: Border.all(color: Colors.white, width: 2),
+        borderRadius: BorderRadius.circular(75.0),
       ),
+      height: 150.0,
+      width: 150.0,
     );
   }
 }
