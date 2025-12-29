@@ -1,4 +1,3 @@
-// xmpp_manager.dart
 import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:xmpp_plugin/xmpp_plugin.dart';
@@ -8,26 +7,24 @@ import 'package:xmpp_plugin/error_response_event.dart';
 import 'package:xmpp_plugin/success_response_event.dart';
 import 'package:xmpp_plugin/models/present_mode.dart';
 import 'package:xmpp_plugin/models/chat_state_model.dart';
+import 'package:async/async.dart'; // For StreamGroup
 
 class XmppManager with WidgetsBindingObserver {
   XmppConnection? _connection;
-  XmppListenerImpl? _listener;
+  XmppListenerAdvanced? _listener;
 
   // --- Reactive Streams ---
   final _messagesController = StreamController<MessageChat>.broadcast();
-  Stream<MessageChat> get messages => _messagesController.stream;
-
+  final _carbonsController = StreamController<MessageChat>.broadcast();
+  final _archiveController = StreamController<MessageChat>.broadcast();
+  final _chatStateController = StreamController<ChatState>.broadcast();
   final _connectionController = StreamController<ConnectionEvent>.broadcast();
-  Stream<ConnectionEvent> get connectionEvents => _connectionController.stream;
-
   final _presenceController = StreamController<PresentModel>.broadcast();
-  Stream<PresentModel> get presenceChanges => _presenceController.stream;
-
   final _errorsController = StreamController<ErrorResponseEvent>.broadcast();
-  Stream<ErrorResponseEvent> get errors => _errorsController.stream;
-
   final _successController = StreamController<SuccessResponseEvent>.broadcast();
-  Stream<SuccessResponseEvent> get successes => _successController.stream;
+
+  // --- Combined stream for all messages ---
+  late final Stream<MessageChat> allMessages;
 
   bool _isConnected = false;
   bool get isConnected => _isConnected;
@@ -35,9 +32,16 @@ class XmppManager with WidgetsBindingObserver {
 
   XmppManager() {
     WidgetsBinding.instance.addObserver(this);
+
+    // Merge all messages into one stream for UI consumption
+    allMessages = StreamGroup.merge([
+      _messagesController.stream,
+      _carbonsController.stream,
+      _archiveController.stream,
+    ]);
   }
 
-  /// App lifecycle handling
+  // --- Lifecycle handling ---
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && !_isConnected && !_isConnecting) {
@@ -45,7 +49,7 @@ class XmppManager with WidgetsBindingObserver {
     }
   }
 
-  /// Connect to XMPP server
+  /// Connect & initialize XMPP
   Future<void> connect({
     required String username,
     required String password,
@@ -54,8 +58,10 @@ class XmppManager with WidgetsBindingObserver {
     int port = 5222,
     bool requireSSL = false,
     bool autoDeliveryReceipt = true,
-    bool useStreamManagement = false,
+    bool useStreamManagement = true,
     bool automaticReconnection = true,
+    bool enableMessageCarbons = true,
+    bool enableChatStates = true,
   }) async {
     if (_isConnecting || _isConnected) return;
 
@@ -74,17 +80,19 @@ class XmppManager with WidgetsBindingObserver {
 
     _connection = XmppConnection(config);
 
-    // Remove old listener if exists
     if (_listener != null) {
       XmppConnection.removeListener(_listener!);
     }
 
-    _listener = XmppListenerImpl(
-      onMessage: _messagesController.add,
+    _listener = XmppListenerAdvanced(
+      onMessage: _safeAddMessage,
       onConnection: _handleConnectionEvent,
-      onError: _errorsController.add,
-      onSuccess: _successController.add,
-      onPresence: _presenceController.add,
+      onError: _safeAddError,
+      onSuccess: _safeAddSuccess,
+      onPresence: _safeAddPresence,
+      onCarbonMessage: enableMessageCarbons ? _safeAddCarbon : (_) {},
+      onArchivedMessage: _safeAddArchive,
+      onChatState: enableChatStates ? _safeAddChatState : (_) {},
     );
 
     XmppConnection.addListener(_listener!);
@@ -96,6 +104,25 @@ class XmppManager with WidgetsBindingObserver {
       });
 
       await _connection!.login();
+
+      if (enableMessageCarbons) {
+        try {
+          await _connection!.enableMessageCarbons();
+        } catch (e) {
+          _errorsController.add(ErrorResponseEvent(error: 'Carbons failed: $e'));
+        }
+      }
+
+      // Retrieve offline messages (MAM)
+      try {
+        final archived = await _connection!.requestArchivedMessages();
+        for (final msg in archived) {
+          _safeAddArchive(msg);
+        }
+      } catch (e) {
+        _errorsController.add(ErrorResponseEvent(error: 'MAM failed: $e'));
+      }
+
     } catch (e) {
       _errorsController.add(ErrorResponseEvent(error: e.toString()));
       _isConnected = false;
@@ -104,8 +131,9 @@ class XmppManager with WidgetsBindingObserver {
     }
   }
 
+  /// Handle connection events
   void _handleConnectionEvent(ConnectionEvent event) async {
-    _connectionController.add(event);
+    _safeAddConnection(event);
 
     final connected = _checkConnected(event);
     if (connected && !_isConnected) {
@@ -126,47 +154,50 @@ class XmppManager with WidgetsBindingObserver {
     try {
       await _connection!.changePresenceType('available', 'chat');
     } catch (e) {
-      _errorsController.add(ErrorResponseEvent(error: e.toString()));
+      _safeAddError(ErrorResponseEvent(error: e.toString()));
     }
   }
 
-  /// Change presence mode
   Future<void> changePresence(String mode) async {
     if (_connection == null || !_isConnected) return;
     try {
       await _connection!.changePresenceType('available', mode);
     } catch (e) {
-      _errorsController.add(ErrorResponseEvent(error: e.toString()));
+      _safeAddError(ErrorResponseEvent(error: e.toString()));
     }
   }
 
-  /// Send a chat message
+  /// Send message with auto-generated ID and timestamp
   Future<void> sendMessage(String to, String body) async {
     if (_connection == null || !_isConnected) {
-      _errorsController.add(ErrorResponseEvent(error: 'Not connected'));
+      _safeAddError(ErrorResponseEvent(error: 'Not connected'));
       return;
     }
-
     final timestamp = DateTime.now().millisecondsSinceEpoch;
     final id = 'msg_$timestamp';
     try {
       await _connection!.sendMessage(to, body, id, timestamp);
     } catch (e) {
-      _errorsController.add(ErrorResponseEvent(error: e.toString()));
+      _safeAddError(ErrorResponseEvent(error: e.toString()));
     }
   }
 
-  Future<void> _reconnectIfNeeded() async {
-    if (_connection != null && !_isConnected) {
+  /// Safe reconnection with retries
+  Future<void> _reconnectIfNeeded({int retries = 5}) async {
+    int attempt = 0;
+    while (!_isConnected && attempt < retries) {
       try {
-        await _connection!.login();
+        attempt++;
+        await _connection?.login();
+        break;
       } catch (e) {
-        _errorsController.add(ErrorResponseEvent(error: 'Reconnect failed: $e'));
+        _safeAddError(ErrorResponseEvent(error: 'Reconnect attempt $attempt failed: $e'));
+        await Future.delayed(Duration(seconds: attempt * 2));
       }
     }
   }
 
-  /// Dispose all resources
+  /// Dispose everything safely
   Future<void> dispose() async {
     WidgetsBinding.instance.removeObserver(this);
 
@@ -180,6 +211,9 @@ class XmppManager with WidgetsBindingObserver {
     } catch (_) {}
 
     await _messagesController.close();
+    await _carbonsController.close();
+    await _archiveController.close();
+    await _chatStateController.close();
     await _connectionController.close();
     await _presenceController.close();
     await _errorsController.close();
@@ -188,22 +222,39 @@ class XmppManager with WidgetsBindingObserver {
     _isConnected = false;
     _isConnecting = false;
   }
+
+  // --- Safe Stream Add Helpers ---
+  void _safeAddMessage(MessageChat m) => _messagesController.isClosed ? null : _messagesController.add(m);
+  void _safeAddCarbon(MessageChat m) => _carbonsController.isClosed ? null : _carbonsController.add(m);
+  void _safeAddArchive(MessageChat m) => _archiveController.isClosed ? null : _archiveController.add(m);
+  void _safeAddChatState(ChatState c) => _chatStateController.isClosed ? null : _chatStateController.add(c);
+  void _safeAddConnection(ConnectionEvent e) => _connectionController.isClosed ? null : _connectionController.add(e);
+  void _safeAddPresence(PresentModel p) => _presenceController.isClosed ? null : _presenceController.add(p);
+  void _safeAddError(ErrorResponseEvent e) => _errorsController.isClosed ? null : _errorsController.add(e);
+  void _safeAddSuccess(SuccessResponseEvent e) => _successController.isClosed ? null : _successController.add(e);
 }
 
-/// Listener implementation using Streams
-class XmppListenerImpl implements DataChangeEvents {
+/// Advanced Listener supporting carbons, MAM, chat states
+class XmppListenerAdvanced implements DataChangeEvents {
   final void Function(MessageChat) onMessage;
   final void Function(ConnectionEvent) onConnection;
   final void Function(ErrorResponseEvent) onError;
   final void Function(SuccessResponseEvent) onSuccess;
   final void Function(PresentModel) onPresence;
 
-  XmppListenerImpl({
+  final void Function(MessageChat) onCarbonMessage;
+  final void Function(MessageChat) onArchivedMessage;
+  final void Function(ChatState) onChatState;
+
+  XmppListenerAdvanced({
     required this.onMessage,
     required this.onConnection,
     required this.onError,
     required this.onSuccess,
     required this.onPresence,
+    required this.onCarbonMessage,
+    required this.onArchivedMessage,
+    required this.onChatState,
   });
 
   @override
@@ -230,5 +281,9 @@ class XmppListenerImpl implements DataChangeEvents {
   }
 
   @override
-  void onChatStateChange(ChatState c) {}
+  void onChatStateChange(ChatState c) => onChatState(c);
+
+  // Advanced callbacks
+  void onMessageCarbon(MessageChat m) => onCarbonMessage(m);
+  void onMessageArchived(MessageChat m) => onArchivedMessage(m);
 }
