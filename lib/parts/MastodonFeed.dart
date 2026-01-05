@@ -1,7 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:toot_ui/toot_ui.dart';
-import 'package:toot_ui/status_form.dart';
 import 'package:toot_ui/models/api/v1/mastodonuser.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
