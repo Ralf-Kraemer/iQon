@@ -4,6 +4,26 @@ import 'dart:math';
 import 'package:http/http.dart' as http;
 import 'videoplayercontainer.dart';
 
+class PeerTubeVideo {
+  final String uri;
+  final String title;
+  final String author;
+  final String? category;
+  final int likes;
+  final int comments;
+  final int views;
+
+  PeerTubeVideo({
+    required this.uri,
+    required this.title,
+    required this.author,
+    this.category,
+    required this.likes,
+    required this.comments,
+    required this.views,
+  });
+}
+
 class VideoPlayerScreen extends StatefulWidget {
   const VideoPlayerScreen({super.key});
 
@@ -13,35 +33,57 @@ class VideoPlayerScreen extends StatefulWidget {
 
 class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   final List<Widget> watchQueue = [];
-  List<String> videoUris = [];
+  final List<PeerTubeVideo> videoQueue = [];
+
+  final Random rng = Random();
   int seed = Random().nextInt(99);
+  int fetchOffset = 0; // ✅ FIX: real pagination offset
 
   @override
   void initState() {
     super.initState();
-    _updateWatchQueue(seed);
+    _updateWatchQueue(0);
     _updateWatchQueue(0);
   }
 
-  Future<List<String>> _fetchPeerTubeVideoUrls(String instanceDomain, int _index, String search) async {
-    final searchUrl = Uri.https(instanceDomain, "api/v1/search/videos");
-    try {
-      final response = await http.get(searchUrl, headers: {
-        'count': '15',
+  Future<List<PeerTubeVideo>> _fetchPeerTubeVideos(
+      String instanceDomain, int start, String search) async {
+    final uri = Uri.https(
+      instanceDomain,
+      "api/v1/search/videos",
+      {
+        'count': '9',
         'durationMax': '240',
-        'start': _index.toString(),
+        'start': start.toString(),
         'sort': (seed % 5 > 2) ? '-publishedAt' : '-views',
         'search': search,
         'languageOneOf': 'en,de',
-      });
+      },
+    );
 
+    try {
+      final response = await http.get(uri);
       if (response.statusCode != 200) return [];
-      final data = json.decode(response.body);
-      if (data['data'].isEmpty) return [];
 
-      return List<String>.from(data['data'].map((item) => "$instanceDomain/api/v1/videos/${item['uuid']}"));
+      final data = json.decode(response.body);
+      final items = (data['data'] as List?) ?? [];
+
+      return items.map((item) {
+        final uuid = item['uuid'];
+        if (uuid == null) return null;
+
+        return PeerTubeVideo(
+          uri: "$instanceDomain/api/v1/videos/$uuid",
+          title: item['name'] ?? 'Untitled',
+          author: item['account']?['displayName'] ?? 'PeerTube',
+          category: item['category']?['label']?.toString(),
+          likes: item['likes'] ?? 0,
+          comments: item['commentCount'] ?? 0,
+          views: item['viewCount'] ?? 0,
+        );
+      }).whereType<PeerTubeVideo>().toList();
     } catch (e) {
-      debugPrint("Failed to fetch video URLs: $e");
+      debugPrint("Failed to fetch PeerTube videos: $e");
       return [];
     }
   }
@@ -49,23 +91,14 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   String _selectPeerTubeInstance() {
     const instances = [
       'tube.shanti.cafe',
-      'p.lu',
-      'peertube.1312.media',
-      'video.antopie.org',
-      'tilvids.com',
-      'videovortex.tv',
-      'video.infosec.exchange',
-      'peertube.ch',
       'makertube.net',
-      'video.4d2.org',
+      'peertube.1312.media',
+      'videovortex.tv',
+      'tilvids.com',
+      'video.infosec.exchange',
       'video.causa-arcana.com',
-      'watch.libertaria.space',
-      'tube.gayfr.online',
-      'peertube.expi.studio',
       'video.coales.co',
       'peertube.craftum.pl',
-      'peertube.keazilla.net',
-      'peertube.fedihub.online',
       'tube.fediverse.games',
       'videos.domainepublic.net',
       'video.rubdos.be',
@@ -87,27 +120,48 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       'tube.graz.social',
       'p.eertu.be'
     ];
-    return instances[Random().nextInt(instances.length)];
+    return instances[rng.nextInt(instances.length)];
   }
 
-  Future<void> _updateWatchQueue(int _index) async {
-
-    List<String> _videoUris = await _fetchPeerTubeVideoUrls(_selectPeerTubeInstance(), _index, '');
-
-    videoUris.addAll(_videoUris);
-
-    if(watchQueue.length >= 12) {
-      watchQueue.removeAt(0);
-    } else {
-        int _selector = Random().nextInt(videoUris.length);
-        watchQueue.add(VideoPlayerContainer(videoUri: videoUris[_selector], videoViewIndex: _index));
-        print(videoUris[_selector]);
-        videoUris.removeAt(_selector);
+  Future<void> _updateWatchQueue(int pageIndex) async {
+    // ✅ FIX: fetch only when needed, advance offset
+    if (videoQueue.length < 3) {
+      final fetched = await _fetchPeerTubeVideos(
+        _selectPeerTubeInstance(),
+        fetchOffset,
+        '',
+      );
+      fetchOffset += fetched.length;
+      videoQueue.addAll(fetched);
     }
 
-    setState(() {
-      seed = Random().nextInt(99);
-    });
+    if (videoQueue.isEmpty) return; // ✅ crash guard
+
+    if (watchQueue.length >= 9) {
+      watchQueue.removeAt(0); // ✅ safe now, replacement guaranteed
+    }
+
+    final selector = rng.nextInt(videoQueue.length);
+    final video = videoQueue[selector];
+
+    watchQueue.add(VideoPlayerContainer(
+      videoUri: video.uri,
+      videoViewIndex: pageIndex,
+      title: video.title,
+      author: video.author,
+      category: video.category,
+      likes: video.likes,
+      comments: video.comments,
+      views: video.views,
+    ));
+
+    videoQueue.removeAt(selector);
+
+    if (mounted) {
+      setState(() {
+        seed = rng.nextInt(99);
+      });
+    }
   }
 
   @override

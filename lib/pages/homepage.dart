@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iqon/parts/chatlogin.dart';
 import 'package:iqon/state/apistate.dart';
 import 'package:iqon/state/objects/MatrixManager.dart';
-import '../utils/helper.dart';
+import 'package:toot_ui/helper.dart';
 
 import 'package:iqon/parts/MastodonFeed.dart';
 import 'package:iqon/parts/scope.dart';

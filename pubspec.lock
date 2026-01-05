@@ -9,6 +9,15 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "91.0.0"
+  activitypub:
+    dependency: "direct main"
+    description:
+      path: "."
+      ref: HEAD
+      resolved-ref: b1ada256034653f6d1010f016d8c0e06a9df2177
+      url: "https://github.com/Ralf-Kraemer/fedodo_ActivityPub"
+    source: git
+    version: "1.2.10"
   analysis_server_plugin:
     dependency: transitive
     description:
@@ -41,6 +50,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.13.10"
+  ansicolor:
+    dependency: transitive
+    description:
+      name: ansicolor
+      sha256: "50e982d500bc863e1d703448afdbf9e5a72eb48840a4f766fa361ffd6877055f"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.0.3"
   app_links:
     dependency: "direct main"
     description:
@@ -97,6 +114,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.13.0"
+  babstrap_settings_screen:
+    dependency: "direct main"
+    description:
+      name: babstrap_settings_screen
+      sha256: "34934aa138671a66ceb1b0e538f4c06db50903085faa195fdda76ae042d0666d"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.1.7"
   base58check:
     dependency: transitive
     description:
@@ -108,9 +133,11 @@ packages:
   better_player:
     dependency: "direct main"
     description:
-      path: "../better_player"
-      relative: true
-    source: path
+      path: "."
+      ref: HEAD
+      resolved-ref: "8ceac202ceb6a13867a44b012d84d308503d8746"
+      url: "https://github.com/Ralf-Kraemer/better_player"
+    source: git
     version: "0.0.84"
   blurhash_dart:
     dependency: transitive
@@ -446,6 +473,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.14.4"
+  flutter_native_splash:
+    dependency: "direct main"
+    description:
+      name: flutter_native_splash
+      sha256: "4fb9f4113350d3a80841ce05ebf1976a36de622af7d19aca0ca9a9911c7ff002"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.4.7"
   flutter_riverpod:
     dependency: "direct main"
     description:
@@ -632,6 +667,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "6.11.2"
+  jwt_decoder:
+    dependency: transitive
+    description:
+      name: jwt_decoder
+      sha256: "54774aebf83f2923b99e6416b4ea915d47af3bde56884eb622de85feabbc559f"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.0.1"
   leak_tracker:
     dependency: transitive
     description:
@@ -664,6 +707,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "6.0.0"
+  logger:
+    dependency: transitive
+    description:
+      name: logger
+      sha256: "7ad7215c15420a102ec687bb320a7312afd449bac63bfb1c60d9787c27b9767f"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.4.0"
   logging:
     dependency: transitive
     description:
@@ -948,18 +999,18 @@ packages:
     dependency: "direct main"
     description:
       name: share_plus
-      sha256: fce43200aa03ea87b91ce4c3ac79f0cecd52e2a7a56c7a4185023c271fbfa6da
+      sha256: d7dc0630a923883c6328ca31b89aa682bacbf2f8304162d29f7c6aaff03a27a1
       url: "https://pub.dev"
     source: hosted
-    version: "10.1.4"
+    version: "11.1.0"
   share_plus_platform_interface:
     dependency: transitive
     description:
       name: share_plus_platform_interface
-      sha256: cc012a23fc2d479854e6c80150696c4a5f5bb62cb89af4de1c505cf78d0a5d0b
+      sha256: "88023e53a13429bd65d8e85e11a9b484f49d4c190abbd96c7932b74d6927cc9a"
       url: "https://pub.dev"
     source: hosted
-    version: "5.0.2"
+    version: "6.1.0"
   shared_preferences:
     dependency: "direct main"
     description:
@@ -1232,10 +1283,12 @@ packages:
   toot_ui:
     dependency: "direct main"
     description:
-      path: "../toot_ui"
-      relative: true
-    source: path
-    version: "4.0.5"
+      path: "."
+      ref: HEAD
+      resolved-ref: d6d61d608f0ac74db8a1d785925316c77253cad4
+      url: "https://github.com/Ralf-Kraemer/toot_ui"
+    source: git
+    version: "4.0.6"
   typed_data:
     dependency: transitive
     description:
@@ -1244,6 +1297,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.4.0"
+  universal_io:
+    dependency: transitive
+    description:
+      name: universal_io
+      sha256: f63cbc48103236abf48e345e07a03ce5757ea86285ed313a6a032596ed9301e2
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.3.1"
   unorm_dart:
     dependency: transitive
     description:

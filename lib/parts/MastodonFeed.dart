@@ -1,10 +1,10 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:toot_ui/toot_ui.dart';
+import 'package:toot_ui/status_form.dart';
 import 'package:toot_ui/models/api/v1/mastodonuser.dart';
-import 'tootview.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:toot_ui/models/api/v1/mastodonstatus.dart';
 
 class MastodonFeed extends ConsumerStatefulWidget {
   const MastodonFeed({Key? key}) : super(key: key);
@@ -118,11 +118,11 @@ class _MastodonFeedState extends ConsumerState<MastodonFeed> {
 
   Widget _buildHoveringButtons(BuildContext context) {
     switch (hoveringLayer) {
-      case "Filter":
+      case "Sort/Filter":
         return Positioned(
-          bottom: 16,
-          left: 16,
-          child: Row(
+          top: 32,
+          right: 16,
+          child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               IconButton(icon: const Icon(Icons.article), onPressed: () {}),
@@ -136,25 +136,35 @@ class _MastodonFeedState extends ConsumerState<MastodonFeed> {
           ),
         );
       case "CreatePicker":
-        return Positioned(
-          bottom: 16,
-          left: 16,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
+        return Stack(
+            fit: StackFit.loose,
+            alignment: Alignment.center,
             children: [
-              IconButton(icon: const Icon(Icons.photo), onPressed: () {}),
-              IconButton(icon: const Icon(Icons.text_fields), onPressed: () {}),
-              IconButton(
-                  icon: const Icon(Icons.cancel),
-                  onPressed: () => setState(() => hoveringLayer = "Default")),
+              Container(
+                color: Colors.black45,
+                width: double.infinity,
+                height: double.infinity,
+              ),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const StatusForm(),
+                  IconButton(icon: const Icon(Icons.photo), onPressed: () {}),
+                  IconButton(icon: const Icon(Icons.text_fields), onPressed: () {}),
+                  IconButton(
+                      icon: const Icon(Icons.cancel),
+                      iconSize: 64,
+                      onPressed: () => setState(() => hoveringLayer = "Default")),
+                ]
+              ),
             ],
-          ),
-        );
+          );
       default:
         return Positioned(
-          bottom: 0.25 * MediaQuery.of(context).size.height,
-          right: 0.25 * MediaQuery.of(context).size.width,
-          child: Row(
+          top: 32,
+          right: 16,
+          child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               IconButton(
@@ -162,7 +172,7 @@ class _MastodonFeedState extends ConsumerState<MastodonFeed> {
                   onPressed: () => setState(() => hoveringLayer = "CreatePicker")),
               IconButton(
                   icon: const Icon(Icons.filter_list),
-                  onPressed: () => setState(() => hoveringLayer = "Filter")),
+                  onPressed: () => setState(() => hoveringLayer = "Sort/Filter")),
             ],
           ),
         );

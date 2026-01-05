@@ -3,7 +3,7 @@ import 'package:flutter_web_browser/flutter_web_browser.dart';
 import 'package:iqon/pages/homepage.dart';
 
 import '../state/objects/ApiOAuth.dart';
-import '../utils/helper.dart';
+import 'package:toot_ui/helper.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({Key? key}) : super(key: key);

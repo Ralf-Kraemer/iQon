@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 
 import 'package:flutter_web_browser/flutter_web_browser.dart';
 import 'package:app_links/app_links.dart';
@@ -12,6 +13,8 @@ import 'pages/loginpage.dart';
 import 'package:toot_ui/helper.dart';
 
 void main() {
+  WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
+  FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
   runApp(const ProviderScope(child: iQonApp()));
 }
 
@@ -141,6 +144,8 @@ class _iQonAppState extends ConsumerState<iQonApp> {
           body: Center(child: CircularProgressIndicator()),
         ),
       );
+    } else {
+      FlutterNativeSplash.remove();
     }
 
     return MaterialApp(

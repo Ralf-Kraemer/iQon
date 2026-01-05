@@ -1,6 +1,11 @@
 name: iqon
 description: antiQ is an iOS and Android app for connecting to decentralized social networks like Mastodon, Tusk and the Fediverse.
 publish_to: none
+flutter_native_splash:
+  color: "#000208"
+  image: assets/icon/splash.png
+  android: true
+  ios: true
 
 version: 2.0.0+35
 
@@ -23,22 +28,28 @@ dependencies:
   url_launcher: ^6.0.9
   flutter_web_browser: ^0.17.1
   app_links: ^7.0.0
-  better_player: 
-    path: ../better_player
+  better_player:
+    git:
+      url: https://github.com/Ralf-Kraemer/better_player
   dio_http_cache:
     git:
       url: https://github.com/Ralf-Kraemer/dio-http-cache.git
   toot_ui: 
     git:
       url: https://github.com/Ralf-Kraemer/toot_ui
+  activitypub: 
+    git:
+      url: https://github.com/Ralf-Kraemer/fedodo_ActivityPub
   carousel_slider: ^5.0.0
   flutter_launcher_icons: ^0.14.3
-  share_plus: ^10.1.4
+  share_plus: ^11.0.0
   flutter_emoji: ^2.5.1
   build_runner: ^2.5.4
   matrix: ^4.1.0
   rename_flutter_project: ^1.0.2
   change_app_package_name: ^1.5.0
+  flutter_native_splash: ^2.4.7
+  babstrap_settings_screen: ^0.1.7
   
 
 dev_dependencies:
@@ -49,6 +60,7 @@ dev_dependencies:
 flutter:
   assets:
     - assets/icon/icon.png
+    - assets/icon/splash.png
   uses-material-design: true
 
 flutter_icons:
